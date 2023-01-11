@@ -1,0 +1,75 @@
+version: "3.8"
+services:
+    # Nginx
+    nginx:
+        image: nginx:alpine
+        container_name: ${APP_NAME}-nginx
+        restart: unless-stopped
+        ports:
+            - 80:80
+        volumes:
+            - ./:/var/www/html:cached
+            - ./.docker/nginx:/etc/nginx/conf.d
+        depends_on:
+            - app
+        networks:
+            - my-app-network
+    # App
+    app:
+        build:
+            context: ./.docker/php
+            dockerfile: Dockerfile
+        working_dir: /var/www/html
+        container_name: ${APP_NAME}
+        restart: unless-stopped
+        volumes:
+            - ./:/var/www/html:cached
+            - ~/.ssh:/root/.ssh:80
+        depends_on:
+            - mysql
+        networks:
+            - my-app-network
+    # Database Server
+    mysql:
+        image: mysql:8.0
+        container_name: ${APP_NAME}-mysql
+        restart: unless-stopped
+        ports:
+            - 3306:3306
+        volumes:
+            - db-data:/var/lib/mysql
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+        networks:
+            - my-app-network
+    # phpmyadmin
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        container_name: ${APP_NAME}-phpmyadmin
+        restart: always
+        ports:
+            - 8081:80
+        depends_on:
+            - mysql
+        environment:
+            PMA_HOST: mysql
+            PMA_PORT: 3306
+            PMA_ARBITRARY: 1
+        networks:
+            - my-app-network
+    # NPM
+    npm:
+        image: node:14
+        working_dir: /var/www/html
+        entrypoint: [ "npm" ]
+        volumes:
+            - "./www/:/var/www/html"
+volumes:
+    db-data:
+        name: db-data
+networks:
+    my-app-network:
+        driver: bridge
